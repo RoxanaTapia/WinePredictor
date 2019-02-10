@@ -69,15 +69,15 @@ class PredictorTypos:
 
     def one_hot_encoding(self, dataframe):
         lb = LabelBinarizer()
-        dataframe = pd.DataFrame(lb.fit_transform(dataframe['country']), columns=lb.classes_)
-        dataframe = pd.DataFrame(lb.fit_transform(dataframe['province']), columns=lb.classes_)
-        dataframe = pd.DataFrame(lb.fit_transform(dataframe['region']), columns=lb.classes_)
-        dataframe = pd.DataFrame(lb.fit_transform(dataframe['variety']), columns=lb.classes_)
-        # df_wine = pd.get_dummies(dataframe, columns=['country'])
-        # df_wine = pd.get_dummies(df_wine, columns=['province'])
-        # df_wine = pd.get_dummies(df_wine, columns=['region'])
-        # df_wine = pd.get_dummies(df_wine, columns=['variety'])
-        return dataframe
+        # dataframe = pd.DataFrame(lb.fit_transform(dataframe['country']), columns=lb.classes_)
+        # dataframe = pd.DataFrame(lb.fit_transform(dataframe['province']), columns=lb.classes_)
+        # dataframe = pd.DataFrame(lb.fit_transform(dataframe['region']), columns=lb.classes_)
+        # dataframe = pd.DataFrame(lb.fit_transform(dataframe['variety']), columns=lb.classes_)
+        df_wine = pd.get_dummies(dataframe, columns=['country'])
+        df_wine = pd.get_dummies(df_wine, columns=['province'])
+        df_wine = pd.get_dummies(df_wine, columns=['region'])
+        df_wine = pd.get_dummies(df_wine, columns=['variety'])
+        return df_wine
 
 
 if __name__ == '__main__':
@@ -122,6 +122,7 @@ if __name__ == '__main__':
                         for X_test_typos in typos_generator.generate_dirty_data(X_test_copy, feature, instance["name"], error_percentages):
 
                             X_test_typos = predictor_typos.one_hot_encoding(X_test_typos)
+                            X_test_typos, X_train = X_test_typos.align(X_train, join='outer', axis=1, fill_value=0)
 
                             regressor = DecisionTreeRegressor()
                             regressor.fit(X_train, y_train)
@@ -143,7 +144,8 @@ if __name__ == '__main__':
 
                         for X_train_typos in typos_generator.generate_dirty_data(X_train_copy, feature, instance["name"], error_percentages):
 
-                            X_train_typos_copy = predictor_typos.one_hot_encoding(X_train_typos)
+                            X_train_typos = predictor_typos.one_hot_encoding(X_train_typos)
+                            X_train_typos, X_test = X_train_typos.align(X_test, join='outer', axis=1, fill_value=0)
 
                             regressor = DecisionTreeRegressor()
                             regressor.fit(X_train_typos, y_train)
