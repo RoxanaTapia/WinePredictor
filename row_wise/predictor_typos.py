@@ -134,8 +134,7 @@ if __name__ == '__main__':
     approaches = ["training", "test"]
     error_percentages = [25, 50, 75]
 
-    typos_x_test = list()
-    typos_x_train = list()
+    experiments = list()
 
     for feature in features:
         print("*****" * 20)
@@ -167,7 +166,10 @@ if __name__ == '__main__':
                         X_train_aux = copy.deepcopy(predictor_typos.one_hot_encoding(X_train))
 
                         for X_test_typos in typos_generator.generate_dirty_data(X_test_copy, feature, instance["name"], error_percentages):
-                            typos_x_test.append(X_test_typos)
+
+                            experiment = dict(mode=mode, approach=approach, constant=X_train_aux, variant=X_test_typos, feature=feature, instance=instance["name"], y_train=y_train, y_test=y_test)
+                            experiments.append(experiment)
+
                             X_test_typos = predictor_typos.one_hot_encoding(X_test_typos)
                             X_test_typos, X_train_aux = X_test_typos.align(X_train_aux, join='outer', axis=1, fill_value=0)
 
@@ -190,7 +192,10 @@ if __name__ == '__main__':
                         X_test_aux = copy.deepcopy(predictor_typos.one_hot_encoding(X_test))
 
                         for X_train_typos in typos_generator.generate_dirty_data(X_train_copy, feature, instance["name"], error_percentages):
-                            typos_x_train.append(X_train_typos)
+
+                            experiment = dict(mode=mode, approach=approach, constant=X_test_aux, variant=X_train_copy, feature=feature, instance=instance["name"], y_train=y_train, y_test=y_test)
+                            experiments.append(experiment)
+
                             X_train_typos = predictor_typos.one_hot_encoding(X_train_typos)
                             X_train_typos, X_test_aux = X_train_typos.align(X_test_aux, join='outer', axis=1, fill_value=0)
 
@@ -210,79 +215,57 @@ if __name__ == '__main__':
                             print('Root Mean Squared Error:', rmse)
 
 
+
     # Claening
+
     expected_distinct_values = ['Central Coast', 'Napa', 'Sicilia']
     correctness = 100
 
     print("CLEANED")
-    for feature in features:
-        print("*****" * 20)
-        print("Feature: ", feature)
 
-        frequencies = predictor_typos.get_value_count(predictor_typos.df_wine, feature)
-        selected_instances = predictor_typos.get_selected_instances(frequencies)
+    for experiment in experiments:
 
-        for instance in selected_instances:
-            print("Instance: ", instance)
+        if experiment["approach"] == "test":
+            X_test_typos = predictor_typos.detect_typos(experiment["variant"], experiment["feature"], experiment["instance"], expected_distinct_values, correctness)
 
-            for mode in modes:
-                df_wine_aux = copy.deepcopy(predictor_typos.df_wine)
+            X_test_typos = predictor_typos.one_hot_encoding(X_test_typos)
+            X_test_typos, X_train = X_test_typos.align(experiment["constant"], join='outer', axis=1, fill_value=0)
 
-                if mode == "single":
-                    df_wine_aux = predictor_typos.discard_columns(df_wine_aux, feature, instance["name"])
+            regressor = DecisionTreeRegressor()
+            regressor.fit(X_train, experiment["y_train"])
+            y_pred = regressor.predict(X_test_typos)
 
-                X_train, X_test, y_train, y_test = predictor_typos.split_data(df_wine_aux)
+            mae = round(metrics.mean_absolute_error(experiment["y_test"], y_pred), 4)
+            mse = round(metrics.mean_squared_error(experiment["y_test"], y_pred), 4)
+            rmse = round(np.sqrt(metrics.mean_squared_error(experiment["y_test"], y_pred)), 4)
 
-                X_test_copy = copy.deepcopy(X_test)
-                X_train_copy = copy.deepcopy(X_train)
+            # The evaluation metrics
+            print('Mode: ', experiment["mode"])
+            print('Approach: ', experiment["approach"])
+            print('Feature: ', experiment["feature"])
+            print('Instance: ', experiment["instance"])
+            print('Mean Absolute Error:', mae)
+            print('Mean Squared Error:', mse)
+            print('Root Mean Squared Error:', rmse)
+        else:
 
-                # typos application
-                for approach in approaches:
+            X_train_typos = predictor_typos.detect_typos(experiment["variant"], experiment["feature"], experiment["instance"], expected_distinct_values, correctness)
+            X_train_typos = predictor_typos.one_hot_encoding(X_train_typos)
+            X_train_typos, X_test = X_train_typos.align(experiment["constant"], join='outer', axis=1, fill_value=0)
 
-                    if approach == "test":
-                        # apply typos to x test
-                        # do one hot encoding of constant
-                        X_train = predictor_typos.one_hot_encoding(X_train)
+            regressor = DecisionTreeRegressor()
+            regressor.fit(X_train_typos, experiment["y_train"])
+            y_pred = regressor.predict(X_test)
 
-                        for X_test_typos in typos_x_test:
-                            X_test_typos = predictor_typos.detect_typos(X_test_typos, feature, instance, expected_distinct_values, correctness)
-                            X_test_typos = predictor_typos.one_hot_encoding(X_test_typos)
-                            X_test_typos, X_train = X_test_typos.align(X_train, join='outer', axis=1, fill_value=0)
-
-                            regressor = DecisionTreeRegressor()
-                            regressor.fit(X_train, y_train)
-                            y_pred = regressor.predict(X_test_typos)
-
-                            mae = round(metrics.mean_absolute_error(y_test, y_pred), 4)
-                            mse = round(metrics.mean_squared_error(y_test, y_pred), 4)
-                            rmse = round(np.sqrt(metrics.mean_squared_error(y_test, y_pred)), 4)
-                            print("")
-                            # The evaluation metrics
-                            print('Mode: ', mode)
-                            print('Approach: ', approach)
-                            print('Mean Absolute Error:', mae)
-                            print('Mean Squared Error:', mse)
-                            print('Root Mean Squared Error:', rmse)
-                    else:
-                        # apply typos to x train
-                        X_test = predictor_typos.one_hot_encoding(X_test)
-
-                        for X_train_typos in typos_x_train:
-                            X_train_typos = predictor_typos.detect_typos(X_train_typos, feature, instance, expected_distinct_values, correctness)
-                            X_train_typos = predictor_typos.one_hot_encoding(X_train_typos)
-                            X_train_typos, X_test = X_train_typos.align(X_test, join='outer', axis=1, fill_value=0)
-
-                            regressor = DecisionTreeRegressor()
-                            regressor.fit(X_train_typos, y_train)
-                            y_pred = regressor.predict(X_test)
-
-                            mae = round(metrics.mean_absolute_error(y_test, y_pred), 4)
-                            mse = round(metrics.mean_squared_error(y_test, y_pred), 4)
-                            rmse = round(np.sqrt(metrics.mean_squared_error(y_test, y_pred)), 4)
-                            print("")
-                            # The evaluation metrics
-                            print('Mode: ', mode)
-                            print('Approach: ', approach)
-                            print('Mean Absolute Error:', mae)
-                            print('Mean Squared Error:', mse)
-                            print('Root Mean Squared Error:', rmse)
+            mae = round(metrics.mean_absolute_error(experiment["y_test"], y_pred), 4)
+            mse = round(metrics.mean_squared_error(experiment["y_test"], y_pred), 4)
+            rmse = round(np.sqrt(metrics.mean_squared_error(experiment["y_test"], y_pred)), 4)
+            print("")
+            # The evaluation metrics
+            print('Mode: ', experiment["mode"])
+            print('Approach: ', experiment["approach"])
+            print('Feature: ', experiment["feature"])
+            print('Instance: ', experiment["instance"])
+            print('Mean Absolute Error:', mae)
+            print('Mean Squared Error:', mse)
+            print('Root Mean Squared Error:', rmse)
