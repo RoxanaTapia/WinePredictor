@@ -48,27 +48,35 @@ class TyposGenerator:
     def insert_typos(self, df, column_name, column_value, n, percent, size):
         print("[OK] Inserting typos in {} out of {} rows in {}. ({}%)".format(n, size, column_value, percent))
 
-        ocurrence_indexes = df.index[df[column_name] == column_value].tolist()
+        # ocurrence_indexes = df.index[df[column_name] == column_value].tolist()
+        # value = df[df[column_name].str.match(column_value)]
+        # value = value.shape[0]
+
+        ocurrence_indexes = pd.np.where(df[column_name] == column_value)[0].tolist()
 
         # select random elements
+        if len(ocurrence_indexes) < n:
+            n = len(ocurrence_indexes)
+
         selected_indexes = random.sample(ocurrence_indexes, n)
         for index, row in df.iterrows():
             if index in selected_indexes:
                 value = self.generate_random_typo(column_value)
                 df.at[index, column_name] = value
-        return df
+        return df, n, size, percent
 
     def generate_dirty_data(self, df, column_name, column_value, n):
         print("*****" * 20)
         temp = copy.deepcopy(df)
+        temp2 = copy.deepcopy(temp)
         for i in n:
-            value = df[df[column_name].str.match(column_value)]
+            value = temp[temp[column_name].str.match(column_value)]
             value = value.shape[0]
 
             rows_affected = int((i * value) / 100.0)
             aux = copy.deepcopy(temp)
-            df_wine_typos = self.insert_typos(aux, column_name, column_value, rows_affected, i, value)
-
-            yield df_wine_typos
+            df_wine_typos, errors, total, percent = self.insert_typos(aux, column_name, column_value, rows_affected, i, value)
+            # temp = temp2
+            yield df_wine_typos, errors, total, percent
 
         print("[OK] Finished")

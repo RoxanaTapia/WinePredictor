@@ -114,6 +114,8 @@ if __name__ == '__main__':
     features = ["region"]
     modes = ["single", "all"]
 
+    results = list()
+
     for feature in features:
 
         print("*****" * 20)
@@ -124,6 +126,10 @@ if __name__ == '__main__':
         # get high, medium and low frequencies
         selected_instances = base_predictor.get_selected_instances(frequencies)
 
+        for selected in selected_instances:
+
+            print("{} = {}".format(selected["name"], selected["value"]))
+
         for instance in selected_instances:
             print("Instance: ", instance)
 
@@ -132,7 +138,7 @@ if __name__ == '__main__':
 
                 if mode == "single":
                     df_wine_aux = base_predictor.discard_columns(df_wine_aux, feature, instance["name"])
-
+                    max_depth, min_samples_split = (4, 14)
                 # print(df_wine_aux.shape)
 
                 # apply one hot encoding
@@ -141,16 +147,17 @@ if __name__ == '__main__':
 
                 # HPO
                 # max_depth, min_samples_split = base_predictor.get_hyper_parameters(X_train, y_train)
-
+                # print(max_depth, min_samples_split)
+                max_depth, min_samples_split = (9, 14)
                 # Prediction
-                # regressor = DecisionTreeRegressor(max_depth=max_depth, min_samples_split=min_samples_split)
-                regressor = DecisionTreeRegressor()
+                regressor = DecisionTreeRegressor(max_depth=max_depth, min_samples_split=min_samples_split)
+                # regressor = DecisionTreeRegressor()
                 regressor.fit(X_train, y_train)
                 y_pred = regressor.predict(X_test)
 
-                mae = round(metrics.mean_absolute_error(y_test, y_pred), 4)
-                mse = round(metrics.mean_squared_error(y_test, y_pred), 4)
-                rmse = round(np.sqrt(metrics.mean_squared_error(y_test, y_pred)), 4)
+                mae = round(metrics.mean_absolute_error(y_test, y_pred), 3)
+                mse = round(metrics.mean_squared_error(y_test, y_pred), 3)
+                rmse = round(np.sqrt(metrics.mean_squared_error(y_test, y_pred)), 3)
                 print("")
                 # The evaluation metrics
                 print('Mode: ', mode)
@@ -158,4 +165,28 @@ if __name__ == '__main__':
                 print('Mean Squared Error:', mse)
                 print('Root Mean Squared Error:', rmse)
 
+                result = dict(
+                    feature=feature,
+                    instance=instance["name"],
+                    mode=mode,
+                    mae=mae,
+                    mse=mse,
+                    rmse=rmse,
+                    delta=0,
+                    precision=0,
+                    recall=0
+                )
+
+                results.append(result)
+
             print("\n*****" * 20)
+
+    for result in results:
+        if result["mode"] == "all":
+            result["mode"] = "All features"
+        else:
+            result["mode"] = "Single feature"
+
+        result = "Region({instance}), {rmse}, {mode}".format(instance=result["instance"], rmse=result["rmse"], mode=result["mode"])
+        print(result)
+

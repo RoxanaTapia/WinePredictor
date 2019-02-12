@@ -119,9 +119,9 @@ class PredictorTypos:
                 b += 1
 
         # print("[OK] Typos detected: {}".format(b+i))
-        # print("[OK] Cleaned: {} rows".format(i))
-        print("[WARN] Couldn't clean {} rows".format(b))
-        return df
+        print("[OK] Cleaned: {} rows".format(i))
+        # print("[WARN] Couldn't clean {} rows".format(b))
+        return df, i
 
 
 if __name__ == '__main__':
@@ -130,9 +130,11 @@ if __name__ == '__main__':
     typos_generator = typos_generator.TyposGenerator()
 
     features = ["region"]
-    modes = ["single", "all"]
-    approaches = ["training", "test"]
-    error_percentages = [25, 50, 75]
+    modes = ["all", "single"]
+    approaches = ["test"]
+    error_percentages = [10, 20, 30, 40, 50, 60, 70, 80, 90]
+
+    results = list()
 
     experiments = list()
 
@@ -151,7 +153,9 @@ if __name__ == '__main__':
 
                 if mode == "single":
                     df_wine_aux = predictor_typos.discard_columns(df_wine_aux, feature, instance["name"])
+                    max_depth, min_samples_split = (4, 14)
 
+                max_depth, min_samples_split = (9, 14)
                 X_train, X_test, y_train, y_test = predictor_typos.split_data(df_wine_aux)
 
                 X_test_copy = copy.deepcopy(X_test)
@@ -165,21 +169,21 @@ if __name__ == '__main__':
                         # do one hot encoding of constant
                         X_train_aux = copy.deepcopy(predictor_typos.one_hot_encoding(X_train))
 
-                        for X_test_typos in typos_generator.generate_dirty_data(X_test_copy, feature, instance["name"], error_percentages):
+                        for X_test_typos, errors, total, percent in typos_generator.generate_dirty_data(X_test_copy, feature, instance["name"], error_percentages):
 
-                            experiment = dict(mode=mode, approach=approach, constant=X_train_aux, variant=X_test_typos, feature=feature, instance=instance["name"], y_train=y_train, y_test=y_test)
+                            experiment = dict(mode=mode, approach=approach, constant=X_train_aux, variant=X_test_typos, feature=feature, instance=instance["name"], y_train=y_train, y_test=y_test, max_depth=max_depth, min_samples_split=min_samples_split, percent=percent)
                             experiments.append(experiment)
 
                             X_test_typos = predictor_typos.one_hot_encoding(X_test_typos)
                             X_test_typos, X_train_aux = X_test_typos.align(X_train_aux, join='outer', axis=1, fill_value=0)
 
-                            regressor = DecisionTreeRegressor()
+                            regressor = DecisionTreeRegressor(max_depth=max_depth, min_samples_split=min_samples_split)
                             regressor.fit(X_train_aux, y_train)
                             y_pred = regressor.predict(X_test_typos)
 
-                            mae = round(metrics.mean_absolute_error(y_test, y_pred), 4)
-                            mse = round(metrics.mean_squared_error(y_test, y_pred), 4)
-                            rmse = round(np.sqrt(metrics.mean_squared_error(y_test, y_pred)), 4)
+                            mae = round(metrics.mean_absolute_error(y_test, y_pred), 3)
+                            mse = round(metrics.mean_squared_error(y_test, y_pred), 3)
+                            rmse = round(np.sqrt(metrics.mean_squared_error(y_test, y_pred)), 3)
                             print("")
                             # The evaluation metrics
                             print('Mode: ', mode)
@@ -187,19 +191,23 @@ if __name__ == '__main__':
                             print('Mean Absolute Error:', mae)
                             print('Mean Squared Error:', mse)
                             print('Root Mean Squared Error:', rmse)
+
+                            result = dict(feature=feature, instance=instance["name"], mode=mode, approach=approach, rmse=rmse, errors=errors, total=total, percentage=percent)
+                            results.append(result)
+
                     else:
                         # apply typos to x train
                         X_test_aux = copy.deepcopy(predictor_typos.one_hot_encoding(X_test))
 
                         for X_train_typos in typos_generator.generate_dirty_data(X_train_copy, feature, instance["name"], error_percentages):
 
-                            experiment = dict(mode=mode, approach=approach, constant=X_test_aux, variant=X_train_copy, feature=feature, instance=instance["name"], y_train=y_train, y_test=y_test)
+                            experiment = dict(mode=mode, approach=approach, constant=X_test_aux, variant=X_train_copy, feature=feature, instance=instance["name"], y_train=y_train, y_test=y_test, max_depth=max_depth, min_samples_split=min_samples_split)
                             experiments.append(experiment)
 
                             X_train_typos = predictor_typos.one_hot_encoding(X_train_typos)
                             X_train_typos, X_test_aux = X_train_typos.align(X_test_aux, join='outer', axis=1, fill_value=0)
 
-                            regressor = DecisionTreeRegressor()
+                            regressor = DecisionTreeRegressor(max_depth=max_depth, min_samples_split=min_samples_split)
                             regressor.fit(X_train_typos, y_train)
                             y_pred = regressor.predict(X_test_aux)
 
@@ -214,24 +222,35 @@ if __name__ == '__main__':
                             print('Mean Squared Error:', mse)
                             print('Root Mean Squared Error:', rmse)
 
+    print("=====" * 20)
+    print("RESULTS DIRTY")
+    print("=====" * 20)
+    for result in results:
+        if result["mode"] == "all":
+            result["mode"] = "All features"
+        else:
+            result["mode"] = "Single feature"
 
+        r = "Region({instance}), {percentage}%, {rmse}, {mode}, {errors}, {total}".format(instance=result["instance"], percentage=result["percentage"], rmse=result["rmse"], mode=result["mode"], errors=result["errors"], total=result["total"])
+        print(r)
+    print("=====" * 20)
 
-    # Claening
+    # cleaning
 
     expected_distinct_values = ['Central Coast', 'Napa', 'Sicilia']
-    correctness = 100
+    correctness = 80
 
-    print("CLEANED")
+    result_cleaned = list()
 
     for experiment in experiments:
 
         if experiment["approach"] == "test":
-            X_test_typos = predictor_typos.detect_typos(experiment["variant"], experiment["feature"], experiment["instance"], expected_distinct_values, correctness)
+            X_test_typos, cleaned = predictor_typos.detect_typos(experiment["variant"], experiment["feature"], experiment["instance"], expected_distinct_values, correctness)
 
             X_test_typos = predictor_typos.one_hot_encoding(X_test_typos)
             X_test_typos, X_train = X_test_typos.align(experiment["constant"], join='outer', axis=1, fill_value=0)
 
-            regressor = DecisionTreeRegressor()
+            regressor = DecisionTreeRegressor(max_depth=experiment["max_depth"], min_samples_split=experiment["min_samples_split"])
             regressor.fit(X_train, experiment["y_train"])
             y_pred = regressor.predict(X_test_typos)
 
@@ -247,13 +266,18 @@ if __name__ == '__main__':
             print('Mean Absolute Error:', mae)
             print('Mean Squared Error:', mse)
             print('Root Mean Squared Error:', rmse)
+
+            result = dict(feature=experiment["feature"], instance=experiment["instance"], mode=experiment["mode"], approach=experiment["approach"], rmse=rmse,
+                          cleaned=cleaned, precision=correctness, percent=experiment["percent"])
+
+            result_cleaned.append(result)
         else:
 
             X_train_typos = predictor_typos.detect_typos(experiment["variant"], experiment["feature"], experiment["instance"], expected_distinct_values, correctness)
             X_train_typos = predictor_typos.one_hot_encoding(X_train_typos)
             X_train_typos, X_test = X_train_typos.align(experiment["constant"], join='outer', axis=1, fill_value=0)
 
-            regressor = DecisionTreeRegressor()
+            regressor = DecisionTreeRegressor(max_depth=experiment["max_depth"], min_samples_split=experiment["min_samples_split"])
             regressor.fit(X_train_typos, experiment["y_train"])
             y_pred = regressor.predict(X_test)
 
@@ -269,3 +293,15 @@ if __name__ == '__main__':
             print('Mean Absolute Error:', mae)
             print('Mean Squared Error:', mse)
             print('Root Mean Squared Error:', rmse)
+
+    print("=====" * 20)
+    print("RESULTS CLEANED")
+    print("====="*20)
+    for result in result_cleaned:
+        if result["mode"] == "all":
+            result["mode"] = "All features"
+        else:
+            result["mode"] = "Single feature"
+        r = "Region({instance}), {percentage}%, {rmse}, {mode}, {cleaned}, {precision}".format(instance=result["instance"], percentage=result["percent"], rmse=result["rmse"], mode=result["mode"], cleaned=result["cleaned"], precision=result["precision"])
+        print(r)
+    print("=====" * 20)
