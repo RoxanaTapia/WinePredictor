@@ -82,15 +82,15 @@ class PredictorMissingValues:
 
 if __name__ == '__main__':
 
-    general_results = list()
+    results = list()
 
     predictor_missing_values = PredictorMissingValues()
     missing_values_generator = missing_values_generator.MissingValuesGenerator()
 
     features = ["region"]
-    modes = ["single", "all"]
-    approaches = ["training", "test"]
-    error_percentages = [25, 50, 75]
+    modes = ["all", "single"]
+    approaches = ["test"]
+    error_percentages = [10, 20, 30, 40, 50, 60, 70, 80, 90]
 
     experiments = list()
 
@@ -109,7 +109,9 @@ if __name__ == '__main__':
 
                 if mode == "single":
                     df_wine_aux = predictor_missing_values.discard_columns(df_wine_aux, feature, instance["name"])
+                    max_depth, min_samples_split = (4, 14)
 
+                max_depth, min_samples_split = (9, 14)
                 X_train, X_test, y_train, y_test = predictor_missing_values.split_data(df_wine_aux)
 
                 X_test_copy = copy.deepcopy(X_test)
@@ -125,9 +127,9 @@ if __name__ == '__main__':
                         # do one hot encoding of constant
                         X_train_aux = copy.deepcopy(predictor_missing_values.one_hot_encoding(X_train))
 
-                        for X_test_typos, y_train_typos in missing_values_generator.generate_missing_values(X_test_copy, feature, instance["name"], error_percentages, y_train_copy):
+                        for X_test_typos, y_train_typos, missing_values, total, percent in missing_values_generator.generate_missing_values(X_test_copy, feature, instance["name"], error_percentages, y_train_copy):
 
-                            experiment = dict(mode=mode, approach=approach, constant=X_train_aux, variant=X_test_typos, feature=feature, instance=instance["name"], y_train=y_train_typos, y_test=y_test)
+                            experiment = dict(mode=mode, approach=approach, constant=X_train_aux, variant=X_test_typos, feature=feature, instance=instance["name"], y_train=y_train_typos, y_test=y_test, percent=percent)
                             experiments.append(experiment)
 
                             X_test_typos = predictor_missing_values.one_hot_encoding(X_test_typos)
@@ -148,19 +150,15 @@ if __name__ == '__main__':
                             print('Mean Squared Error:', mse)
                             print('Root Mean Squared Error:', rmse)
 
-                            result = dict(
-                                feature=feature,
-                                instance=instance["name"],
-                                mode=mode,
-                                approach=approach,
-                                mae=mae,
-                                mse=mse,
-                                rmse=rmse,
-                                delta=0,
-                                precision=0,
-                                recall=0
-                            )
-                            general_results.append(result)
+                            result = dict(feature=feature,
+                                          instance=instance["name"],
+                                          mode=mode,
+                                          approach=approach,
+                                          rmse=rmse,
+                                          missing_values=missing_values,
+                                          total=total,
+                                          percentage=percent)
+                            results.append(result)
                     else:
                         # apply typos to x train
                         X_test_aux = copy.deepcopy(predictor_missing_values.one_hot_encoding(X_test))
@@ -188,20 +186,37 @@ if __name__ == '__main__':
                             print('Mean Squared Error:', mse)
                             print('Root Mean Squared Error:', rmse)
 
-                            result = dict(
-                                feature=feature,
-                                instance=instance["name"],
-                                mode=mode,
-                                approach=approach,
-                                mae=mae,
-                                mse=mse,
-                                rmse=rmse,
-                                delta=0,
-                                precision=0,
-                                recall=0
-                            )
-                            general_results.append(result)
+                            result = dict(feature=feature,
+                                          instance=instance["name"],
+                                          mode=mode,
+                                          approach=approach,
+                                          rmse=rmse,
+                                          missing_values=missing_values,
+                                          total=total,
+                                          percentage=percent)
+                            results.append(result)
     # Claening
+
+    print("=====" * 20)
+    print("RESULTS DIRTY")
+    print("=====" * 20)
+    for result in results:
+        if result["mode"] == "all":
+            result["mode"] = "All features"
+        else:
+            result["mode"] = "Single feature"
+
+        r = "Region({instance}), {percentage}%, {rmse}, {mode}, {missing_values}, {total}".format(
+            instance=result["instance"],
+            percentage=result["percentage"],
+            rmse=result["rmse"],
+            mode=result["mode"],
+            missing_values=result["missing_values"],
+            total=result["total"]
+        )
+        print(r)
+    print("=====" * 20)
+
 
     expected_distinct_values = ['Central Coast', 'Napa', 'Sicilia']
     correctness = 100

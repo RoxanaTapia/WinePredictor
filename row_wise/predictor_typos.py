@@ -177,7 +177,7 @@ if __name__ == '__main__':
                             X_test_typos = predictor_typos.one_hot_encoding(X_test_typos)
                             X_test_typos, X_train_aux = X_test_typos.align(X_train_aux, join='outer', axis=1, fill_value=0)
 
-                            regressor = DecisionTreeRegressor(max_depth=max_depth, min_samples_split=min_samples_split)
+                            regressor = DecisionTreeRegressor()
                             regressor.fit(X_train_aux, y_train)
                             y_pred = regressor.predict(X_test_typos)
 
@@ -250,7 +250,7 @@ if __name__ == '__main__':
             X_test_typos = predictor_typos.one_hot_encoding(X_test_typos)
             X_test_typos, X_train = X_test_typos.align(experiment["constant"], join='outer', axis=1, fill_value=0)
 
-            regressor = DecisionTreeRegressor(max_depth=experiment["max_depth"], min_samples_split=experiment["min_samples_split"])
+            regressor = DecisionTreeRegressor()
             regressor.fit(X_train, experiment["y_train"])
             y_pred = regressor.predict(X_test_typos)
 

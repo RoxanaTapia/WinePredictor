@@ -27,6 +27,11 @@ class MissingValuesGenerator:
         ocurrence_indexes = df.index[df[column_name] == column_value].tolist()
 
         # select random elements
+
+        if len(ocurrence_indexes) < n:
+            n = len(ocurrence_indexes)
+
+
         selected_indexes = random.sample(ocurrence_indexes, n)
 
         for index, row in df.iterrows():
@@ -34,7 +39,7 @@ class MissingValuesGenerator:
                 df.at[index, column_name] = "X"
                 y_train.at[index, "points"] = -1
 
-        return df, y_train
+        return df, y_train, n, size, percent
 
     def generate_missing_values(self, df, column_name, column_value, n, y_train):
         print("*****" * 20)
@@ -47,8 +52,8 @@ class MissingValuesGenerator:
             rows_affected = int((i * value) / 100.0)
             aux = copy.deepcopy(temp)
             aux2 = copy.deepcopy(y_train_copy)
-            df_wine_typos, y_train = self.insert_missing_values(aux, column_name, column_value, rows_affected, i, value, aux2)
+            df_wine_typos, y_train, missing_values, total, percent = self.insert_missing_values(aux, column_name, column_value, rows_affected, i, value, aux2)
 
-            yield df_wine_typos, y_train
+            yield df_wine_typos, y_train, missing_values, total, percent
 
         print("[OK] Finished")

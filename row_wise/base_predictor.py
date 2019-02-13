@@ -111,6 +111,8 @@ class BasePredictor:
 if __name__ == '__main__':
     base_predictor = BasePredictor()
 
+    base_predictor.get_distinct_values("region")
+
     features = ["region"]
     modes = ["single", "all"]
 
@@ -138,7 +140,7 @@ if __name__ == '__main__':
 
                 if mode == "single":
                     df_wine_aux = base_predictor.discard_columns(df_wine_aux, feature, instance["name"])
-                    max_depth, min_samples_split = (4, 14)
+                    # max_depth, min_samples_split = (4, 14)
                 # print(df_wine_aux.shape)
 
                 # apply one hot encoding
@@ -148,16 +150,16 @@ if __name__ == '__main__':
                 # HPO
                 # max_depth, min_samples_split = base_predictor.get_hyper_parameters(X_train, y_train)
                 # print(max_depth, min_samples_split)
-                max_depth, min_samples_split = (9, 14)
+                # max_depth, min_samples_split = (9, 14)
                 # Prediction
-                regressor = DecisionTreeRegressor(max_depth=max_depth, min_samples_split=min_samples_split)
+                regressor = DecisionTreeRegressor()
                 # regressor = DecisionTreeRegressor()
                 regressor.fit(X_train, y_train)
                 y_pred = regressor.predict(X_test)
 
-                mae = round(metrics.mean_absolute_error(y_test, y_pred), 3)
-                mse = round(metrics.mean_squared_error(y_test, y_pred), 3)
-                rmse = round(np.sqrt(metrics.mean_squared_error(y_test, y_pred)), 3)
+                mae = round(metrics.mean_absolute_error(y_test, y_pred), 4)
+                mse = round(metrics.mean_squared_error(y_test, y_pred), 4)
+                rmse = round(np.sqrt(metrics.mean_squared_error(y_test, y_pred)), 4)
                 print("")
                 # The evaluation metrics
                 print('Mode: ', mode)
